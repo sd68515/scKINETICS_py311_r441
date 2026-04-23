@@ -456,7 +456,7 @@ def read_peak_bed(peak_bed_file_path,npeaks=10):
     
     
 def read_motif_file(motif_file,genes=None):
-    motif_dir = os.path.join(os.getcwd(),'sckinetics','motif_data')
+    motif_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'motif_data')
     motifs = read_motifs(os.path.join(motif_dir,motif_file))
     for motif in motifs:
         motif_names = motif.factors.get('direct', []) + motif.factors.get('indirect\nor predicted', [])

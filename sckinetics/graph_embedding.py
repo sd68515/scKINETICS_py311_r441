@@ -2,10 +2,10 @@ from .base import check_is_fitted
 from .tf_targets import *
 from tqdm.auto import tqdm
 
+import warnings
 import scipy
 from scipy.sparse import csr_matrix
 import sklearn.neighbors
-from numpy.linalg import norm
 
 from scvelo.tools.utils import *
 from scvelo.tools.velocity_embedding import quiver_autoscale
@@ -190,10 +190,15 @@ def plot_velocities_stream(adata,model,knn=30,embedding_basis=None,figsize=(10,1
 
 def cosine_correlation(dX, Vi): #function taken directly from scVelo
         #dX -= dX.mean(-1)[:, None]
-        Vi_norm = vector_norm(Vi)
+        Vi_norm = np.linalg.norm(Vi)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            result = np.zeros(dX.shape[0]) if Vi_norm == 0 else np.einsum('ij, j', dX, Vi) / (norm(dX) * Vi_norm)[None, :]
+            if Vi_norm == 0:
+                result = np.zeros(dX.shape[0])
+            else:
+                dX_norm = np.linalg.norm(dX, axis=1)
+                dX_norm[dX_norm == 0] = 1.0
+                result = np.einsum('ij,j->i', dX, Vi) / (dX_norm * Vi_norm)
            # result = 1.0 - scipy.spatial.distance.cosine(dX,Vi)
         return result
 
