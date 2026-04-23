@@ -5,6 +5,7 @@ from tqdm.auto import tqdm
 import scipy
 from scipy.sparse import csr_matrix
 import sklearn.neighbors
+from numpy.linalg import norm
 
 from scvelo.tools.utils import *
 from scvelo.tools.velocity_embedding import quiver_autoscale

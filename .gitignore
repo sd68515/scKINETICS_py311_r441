@@ -1,7 +1,10 @@
 .codex-local/
+.codex
 .serena/
 genomes/
 docs/
+outputs/
+demo/demo_data/
 temp.txt
 __pycache__/
 *.py[cod]

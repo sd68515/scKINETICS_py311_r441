@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import pandas as pd
 
@@ -10,6 +11,34 @@ import tempfile
 from Bio.SeqUtils import gc_fraction
 from ucsc_genomes_downloader import Genome
 from gimmemotifs.motif import read_motifs
+
+
+def _configure_conda_r_home():
+    exec_prefix = os.path.dirname(os.path.dirname(sys.executable))
+    env_prefix = exec_prefix
+    if not os.path.isdir(os.path.join(env_prefix, "lib", "R")):
+        env_prefix = os.environ.get("CONDA_PREFIX", exec_prefix)
+
+    env_bin = os.path.join(env_prefix, "bin")
+    r_home = os.path.join(env_prefix, "lib", "R")
+    r_library = os.path.join(r_home, "library")
+
+    current_path = os.environ.get("PATH", "")
+    path_entries = current_path.split(os.pathsep) if current_path else []
+    if os.path.isdir(env_bin) and (not path_entries or path_entries[0] != env_bin):
+        os.environ["PATH"] = os.pathsep.join([env_bin, *[entry for entry in path_entries if entry != env_bin]])
+
+    if os.path.isdir(r_home):
+        os.environ["R_HOME"] = r_home
+
+    if os.path.isdir(r_library):
+        for env_var in ("R_LIBS", "R_LIBS_SITE", "R_LIBS_USER"):
+            if os.environ.get(env_var) != r_library:
+                os.environ[env_var] = r_library
+
+
+_configure_conda_r_home()
+
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 import rpy2.robjects.packages as rpackages
@@ -333,7 +362,10 @@ class PeakAnnotation():
                         # motif_end = start_ + int(h.pos) + len(motif) + 1
                         score = round(h.score, 4)
                         #if score > 4:
-                        motif_names = motif.factors['included']#motif.factors['direct'] + motif.factors['indirect\nor predicted']
+                        motif_names = motif.factors.get('included')
+                        if motif_names is None:
+                            motif_names = motif.factors.get('direct', []) + motif.factors.get('indirect\nor predicted', [])
+                            motif_names = np.unique([motif_name.upper() for motif_name in motif_names]).tolist()
                         for motif_name in motif_names:#np.intersect1d(motif_names,self.genes):
                             record = [chr_, start_, stop_, motif_name, score]#, strand, chr_, motif_start, motif_end,
                                   #str(record_dict[seq].seq)[h.pos:(h.pos+len(motif))],str(motif.consensus),quantile]
@@ -426,15 +458,17 @@ def read_peak_bed(peak_bed_file_path,npeaks=10):
 def read_motif_file(motif_file,genes=None):
     motif_dir = os.path.join(os.getcwd(),'sckinetics','motif_data')
     motifs = read_motifs(os.path.join(motif_dir,motif_file))
+    for motif in motifs:
+        motif_names = motif.factors.get('direct', []) + motif.factors.get('indirect\nor predicted', [])
+        motif_names = np.unique([motif_name.upper() for motif_name in motif_names]).tolist()
+        motif.factors['included'] = motif_names
+
     if genes is None:
         return motifs
 
     motifs_keep = []
-    # to do: parallelize this
     for motif in motifs:
-        motif_names = motif.factors['direct'] + motif.factors['indirect\nor predicted']
-        motif_names=[motif.upper() for motif in motif_names]
-        included_genes = np.intersect1d(motif_names,genes)
+        included_genes = np.intersect1d(motif.factors['included'],genes).tolist()
         if len(included_genes)>0:
             motif.factors['included'] = included_genes
             motifs_keep.append(motif)
