@@ -25,7 +25,7 @@ This fork currently focuses on:
 
 - Python `3.10`
 - R `4.4.x`
-- conda / mamba-based environments that are easier to relocate with tools such as `conda-pack`
+- conda-based environments that are easier to relocate with tools such as `conda-pack`
 - current `scanpy`, `scvelo`, `rpy2`, `NumPy`, and `Biopython` compatibility
 - TxDb-based peak annotation workflows used by the current `scKINETICS` codebase
 - initial `mm39` support with minimal intrusion into the upstream workflow
@@ -41,9 +41,8 @@ This fork includes both environment-level and source-level changes.
   - `rpy2 3.6.6`
   - `scanpy 1.11.5`
   - `scvelo 0.3.4`
-- provided two conda environment files:
+- provided a single conda environment file:
   - `environment-sckinetics.yml`
-  - `sckinetics_requirements.yml`
 - kept R / Bioconductor installation conda-oriented where possible so the environment is easier to migrate to work servers
 
 ### Source-level changes
@@ -123,15 +122,15 @@ Validated environment:
 - `scanpy 1.11.5`
 - `scvelo 0.3.4`
 
-Environment files:
+Environment file:
 
 - `environment-sckinetics.yml`
-- `sckinetics_requirements.yml`
 
 Example:
 
 ```bash
-mamba env create -f environment-sckinetics.yml
+conda create -n sckinetics python=3.10 r-base=4.4.1 -y
+conda env update -n sckinetics -f environment-sckinetics.yml
 conda activate sckinetics
 ```
 
