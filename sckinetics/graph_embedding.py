@@ -86,8 +86,12 @@ class VelocityGraph():
         V_emb = np.zeros(embedding.shape) #code from scVelo
         for i in range(self.T.shape[0]):
             indices = self.T[i].indices
+            if len(indices) == 0:
+                continue
             dX = embedding[indices] - embedding[i, None]  #vectors of nearest neighbors
-            dX /= norm(dX)[:, None]
+            dX_norm = np.linalg.norm(dX, axis=1, keepdims=True)
+            dX_norm[dX_norm == 0] = 1.0
+            dX = dX / dX_norm
             dX[np.isnan(dX)] = 0
             probs = self.T[i].data #transition probabilities
             V_emb[i] = probs.dot(dX) - probs.mean() * dX.sum(0)
