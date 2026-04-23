@@ -1,0 +1,13 @@
+.codex-local/
+.serena/
+genomes/
+docs/
+temp.txt
+__pycache__/
+*.py[cod]
+*.so
+.DS_Store
+.ipynb_checkpoints/
+.Rhistory
+.RData
+.Ruserdata

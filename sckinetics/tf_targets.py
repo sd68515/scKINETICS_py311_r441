@@ -7,13 +7,13 @@ import MOODS.tools
 import MOODS.scan
 import tempfile
 
-from Bio.SeqUtils import GC
+from Bio.SeqUtils import gc_fraction
 from ucsc_genomes_downloader import Genome
 from gimmemotifs.motif import read_motifs
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 import rpy2.robjects.packages as rpackages
-from rpy2.robjects.vectors import StrVector
+from rpy2.robjects.vectors import IntVector, StrVector
 import rpy2.robjects as ro
 from rpy2.robjects.conversion import localconverter
 import mygene
@@ -32,7 +32,7 @@ class SeqRecord():
     def __init__(self,seqid,seq):
         self.id = seqid
         self.seq = seq
-        self.GC = GC(seq)
+        self.GC = gc_fraction(seq) * 100
         
 class TargetRecord():
     def __init__(self,gene_name,index=None):
@@ -60,6 +60,17 @@ class GenomeRecord():
             
             TXDB= importr('TxDb.Mmusculus.UCSC.mm10.knownGene')
             self.genome_annotations = TXDB.TxDb_Mmusculus_UCSC_mm10_knownGene
+            self.species = 'mouse'
+
+        elif genome == 'mm39':
+            print("Loading genome (this make take a while!) ...")
+            self.genome = Genome(assembly='mm39',chromosomes=chromosomes)
+
+            print("Loading motifs ...")
+            self.motifs = read_motif_file("CisBP_ver2_Mus_musculus.pfm")
+
+            TXDB= importr('TxDb.Mmusculus.UCSC.mm39.knownGene')
+            self.genome_annotations = TXDB.TxDb_Mmusculus_UCSC_mm39_knownGene
             self.species = 'mouse'
 
         
@@ -111,6 +122,7 @@ class PeakAnnotation():
             self.genome = genome.genome
             self.motifs = genome.motifs
             self.genome_annotations = genome.genome_annotations
+            self.species = genome.species
         
         elif type(genome) == str:
             
@@ -126,6 +138,15 @@ class PeakAnnotation():
                 self.genome_annotations = TXDB.TxDb_Mmusculus_UCSC_mm10_knownGene
                 self.species = 'mouse'
 
+            elif genome == 'mm39':
+                print("Loading genome (this make take a while!) ...")
+                self.genome = Genome(assembly='mm39',chromosomes=chromosomes)
+                print("Loading motifs ...")
+                self.motifs = read_motif_file("CisBP_ver2_Mus_musculus.pfm",self.genes)
+
+                TXDB= importr('TxDb.Mmusculus.UCSC.mm39.knownGene')
+                self.genome_annotations = TXDB.TxDb_Mmusculus_UCSC_mm39_knownGene
+                self.species = 'mouse'
 
             elif genome == 'hg38':
                 print("Loading genome (this make take a while!) ...")
@@ -140,7 +161,7 @@ class PeakAnnotation():
             
 
     #wrapper to run all of the below functions sequentially        
-    def call_motifs(self,peak_bed_file, pvalue=1e-3,filterGenes=True,max_upstream_distance=500, max_downstream_distance=3000):
+    def call_motifs(self,peak_bed_file, pvalue=1e-3,filterGenes=True,max_upstream_distance=500, max_downstream_distance=3000, delete_genome_cache=False):
         print("Calling motifs with default settings...")
         targets = self.annotate_peaks(peak_bed_file,filterGenes=filterGenes,
                                       max_upstream_distance=max_upstream_distance, 
@@ -149,7 +170,8 @@ class PeakAnnotation():
         reduced_peak_bed_file = targets[['seqnames','start','end']].drop_duplicates()
         reduced_peak_bed_file.columns = ['chrom','chromStart','chromEnd']
         record_dict = self.extract_peak_sequence(reduced_peak_bed_file)
-        self.genome.delete()
+        if delete_genome_cache:
+            self.genome.delete()
         bgs = self.compute_background(record_dict)
 
         motifs = self.scan_peaks(record_dict,bgs,pvalue=pvalue,pseudocount=0.01,filterGenes=filterGenes)
@@ -158,7 +180,7 @@ class PeakAnnotation():
         self.pairs = motifs.merge(targets,on=['seqnames','start','end'])
         tmp = []
         for peak in range(self.pairs.shape[0]):
-            peak = self.pairs.iloc[peak,:3].values.astype(np.str)
+            peak = self.pairs.iloc[peak,:3].values.astype(str)
             tmp.append("{}:{}-{}".format(peak[0],peak[1],peak[2]))
         self.pairs['peak_name'] = tmp
         self.pairs = self.pairs.set_index("peak_name")
@@ -237,7 +259,7 @@ class PeakAnnotation():
         for i,row in enumerate(peak_bed_file.iterrows()):
             print("\r{}".format(i),end="")
             peak = row[1].values
-            peakname="_".join(peak.astype(np.str))
+            peakname="_".join(peak.astype(str))
             record_dict[peakname] = SeqRecord(peakname,self.genome._chromosomes[peak[0]][peak[1]:peak[2]])
         return record_dict
 
@@ -339,11 +361,12 @@ class PeakAnnotation():
         CSK = importr('ChIPseeker')
         meth = importr('methods')
         
-        pandas2ri.activate() 
         print("Running ChIPSeeker ...")       
         peaks = GR.GRanges(
-        seqnames = S4V.Rle(peak_bed_file['chrom']),
-        ranges = IR.IRanges(peak_bed_file['chromStart'],peak_bed_file['chromEnd']))
+        seqnames = S4V.Rle(StrVector(peak_bed_file['chrom'].astype(str).tolist())),
+        ranges = IR.IRanges(
+            IntVector(peak_bed_file['chromStart'].astype(int).tolist()),
+            IntVector(peak_bed_file['chromEnd'].astype(int).tolist())))
         
         r_df_annoPeakTab = base.as_data_frame(meth.slot(CSK.annotatePeak(peaks,TxDb = self.genome_annotations),"anno"))
         
@@ -354,6 +377,9 @@ class PeakAnnotation():
         annoPeakTab = annoPeakTab.loc[index]
 
         print("Converting gene annotations ...")          
+        if len(annoPeakTab) == 0:
+            annoPeakTab['target'] = pd.Series(dtype=object)
+            return annoPeakTab
         
         mg = mygene.MyGeneInfo()
 #         gene_names=[]
@@ -397,9 +423,12 @@ def read_peak_bed(peak_bed_file_path,npeaks=10):
     peak_bed_file['chromEnd'] = peak_bed_file['chromEnd'].values.astype(np.int32)
     
     
-def read_motif_file(motif_file,genes):
-    motif_dir=os.getcwd()+'/sckinetics/motif_data/'
-    motifs = read_motifs(motif_dir+motif_file)
+def read_motif_file(motif_file,genes=None):
+    motif_dir = os.path.join(os.getcwd(),'sckinetics','motif_data')
+    motifs = read_motifs(os.path.join(motif_dir,motif_file))
+    if genes is None:
+        return motifs
+
     motifs_keep = []
     # to do: parallelize this
     for motif in motifs:
