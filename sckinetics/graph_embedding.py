@@ -34,7 +34,10 @@ class VelocityGraph():
         else:
             self.adata=adata
             self.velocities=model.velocities_
-        print("Make sure that the model had already been fitted!")
+        warnings.warn(
+            "Make sure that the model had already been fitted!",
+            UserWarning,
+        )
         self.knn=knn #for better velocity stream visualizations, we use a smaller knn value to construct the graph
         
         self.graph=None
@@ -140,10 +143,10 @@ def embedding_stream_subset(embedding, adata, celltypes_to_plot, celltype_basis,
     : celltypes_to_plot: a list of celltypes in adata.obs[celltype_basis] to plot stream plot
     : celltypes_colors: a list of color codes organized for each individual cell
     """
-    if velocity_embedding is None:
-        print("Need to first compute velocity embeddings!")
+    if V_emb is None:
+        warnings.warn("Need to first compute velocity embeddings!", UserWarning)
     if celltypes_colors is None:
-        print("Need to first define celltype colors.")
+        warnings.warn("Need to first define celltype colors.", UserWarning)
     subset_index=np.where(adata.obs[celltype_basis].isin(celltypes_to_plot))[0]
     cluster_color=pd.Series(celltypes_colors)
     X_grid, V_grid = compute_velocity_on_grid(X_emb=embedding[subset_index], V_emb=V_emb[subset_index],

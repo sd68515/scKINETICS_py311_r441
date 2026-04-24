@@ -1,4 +1,5 @@
 import os
+import warnings
 import numpy as np
 import pandas as pd
 
@@ -9,7 +10,7 @@ def add_differential_peaks(adata,cluster_basis):
     """
     : Add differential peaks based on clusters using Fisher's exact test
     """
-    print("Make sure the input adata has raw counts!")
+    warnings.warn("Make sure the input adata has raw counts!", UserWarning)
     adata_copy = adata.copy()
     
     data_bin = pd.DataFrame((adata.X.A>0.0)*1.0,

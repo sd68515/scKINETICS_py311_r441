@@ -54,6 +54,7 @@ from sklearn.neighbors import NearestNeighbors
 from math import ceil
 from tqdm.auto import tqdm
 import contextlib
+import warnings
 import joblib
 from joblib import Parallel, delayed
 
@@ -119,7 +120,10 @@ class PeakAnnotation():
     
     def __init__(self, adata, genome = 'mm10', chromosomes = None):
         
-        print("Starting peak annotation. Make sure the X matrix in adata has been log transformed.")
+        warnings.warn(
+            "Make sure the X matrix in adata has been log transformed.",
+            UserWarning,
+        )
         adata.var_names=[x.upper() for x in adata.var_names]
         self.genes = adata.var_names
         self.adata = adata
