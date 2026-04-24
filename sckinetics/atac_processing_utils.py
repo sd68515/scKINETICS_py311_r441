@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from scipy.stats import fisher_exact
+from tqdm.auto import tqdm
 
 def add_differential_peaks(adata,cluster_basis):
     """
@@ -34,8 +35,13 @@ def add_differential_peaks(adata,cluster_basis):
         group1 = data_bin.iloc[np.where(celltypes == c)[0], : ]
         group2 = data_bin.iloc[np.where(celltypes != c)[0], : ]
 
-        for peak in col_list:
-            print('\r{}'.format(peak),end="")
+        for peak in tqdm(
+            col_list,
+            desc="Cluster {}".format(c),
+            unit="peak",
+            leave=False,
+            dynamic_ncols=True,
+        ):
 
             a_ = np.array(group1[peak])
             b_ = np.array(group2[peak])
@@ -64,4 +70,3 @@ def add_differential_peaks(adata,cluster_basis):
     adata_copy.varm['differential_peaks_pvals'] = pval_df
     
     return adata_copy
-    

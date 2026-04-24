@@ -299,8 +299,13 @@ def get_constraints(adata, celltype_priors, knn, celltypes):
     alpha_all,beta_all = np.zeros((num_cells, num_genes), dtype=np.float64), np.zeros((num_cells, num_genes), dtype=np.float64)
     #get velocities for each cell
 
-    for cellrand in range(num_cells):
-        print("\r{}".format(cellrand),end="")
+    for cellrand in tqdm(
+        range(num_cells),
+        desc="Calculating constraints",
+        unit="cell",
+        leave=False,
+        dynamic_ncols=True,
+    ):
         slopedist = data.iloc[np.where(kNN_graph[cellrand,:])[0]].values - data.iloc[cellrand].values
         offset = np.std(slopedist,axis=0) / 10.0
         # clip zero values to avoid nans
@@ -325,7 +330,7 @@ def get_constraints(adata, celltype_priors, knn, celltypes):
         med = kmeds.components_[np.argmax(cosinecorrs)]
         alpha_all[cellrand, :] = med - offset
         beta_all[cellrand, :] = med + offset
-    print("\nFinished getting all constraints.")
+    print("Finished getting all constraints.")
 
     return pd.DataFrame(alpha_all.astype(np.float64), columns=columns, index=index), pd.DataFrame(beta_all.astype(np.float64), columns=columns, index=index), kNN_graph
         

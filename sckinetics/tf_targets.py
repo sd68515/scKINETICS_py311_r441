@@ -283,17 +283,23 @@ class PeakAnnotation():
         return G
 
     def extract_peak_sequence(self, peak_bed_file):
-        print("Extracting peak sequence...")
         record_dict={}
-        for i,row in enumerate(peak_bed_file.iterrows()):
-            print("\r{}".format(i),end="")
-            peak = row[1].values
+        peak_iterator = tqdm(
+            peak_bed_file.iterrows(),
+            total=peak_bed_file.shape[0],
+            desc="Extracting peak sequences",
+            unit="peak",
+            leave=False,
+            dynamic_ncols=True,
+        )
+        for _, row in peak_iterator:
+            peak = row.values
             peakname="_".join(peak.astype(str))
             record_dict[peakname] = SeqRecord(peakname,self.genome._chromosomes[peak[0]][peak[1]:peak[2]])
         return record_dict
 
     def compute_background(self,record_dict):
-        print("\nComputing background...")
+        print("Computing background...")
         GC_content = np.array([record_dict[rec].GC for rec in record_dict])
         peak_names = np.array([record_dict[rec].id for rec in record_dict])
         
@@ -304,15 +310,18 @@ class PeakAnnotation():
         for quantile in ['first','second','third','fourth']:
             seqs = peak_names[np.where(self.quantiles==quantile)[0]]
             all_seqs = ""
-            for seq in tqdm(seqs):
+            for seq in tqdm(
+                seqs,
+                desc="Background {}".format(quantile),
+                unit="peak",
+                leave=False,
+                dynamic_ncols=True,
+            ):
                 all_seqs = all_seqs + str(record_dict[seq].seq)
             bgs.append(MOODS.tools.bg_from_sequence_dna(all_seqs,1))
         return bgs
             
     def scan_peaks(self,record_dict, bgs, window_size=7,pseudocount=1,pvalue=1e-3, filterGenes=True):
-        
-        print("Scanning peaks...")
-        
         #CellRanger code
         def _pwm_to_moods_matrix(pwm, bg, pseudocount):
             """Convert JASPAR motif into a MOODS log_odds matrix, using the give background distribution & pseudocounts
@@ -343,9 +352,14 @@ class PeakAnnotation():
             scanner.set_motifs(matrices, bg, thresholds)
 
             seqs = peak_names[np.where(self.quantiles==quantile)[0]]
-            
-            for i,seq in enumerate(seqs): 
-                print("\r Peak {} in {} quantile".format(i, quantile),end="")
+
+            for seq in tqdm(
+                seqs,
+                desc="Scanning {}".format(quantile),
+                unit="peak",
+                leave=False,
+                dynamic_ncols=True,
+            ):
                 chr_,start_,stop_ = seq.split("_")
                 start_ = int(start_)
                 stop_ = int(stop_)
@@ -371,7 +385,7 @@ class PeakAnnotation():
                                   #str(record_dict[seq].seq)[h.pos:(h.pos+len(motif))],str(motif.consensus),quantile]
                             all_reqs.append(record)
         
-        print("Finished peak scanning. Compiling all data (this might take a while!!)\n")
+        print("Finished peak scanning. Compiling all data (this might take a while!!)")
         df = pd.DataFrame(all_reqs, columns = columns)
         if filterGenes:
             print("Filtering genes...")
